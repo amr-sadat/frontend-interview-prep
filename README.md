@@ -30,7 +30,8 @@ Each topic contains:
 
 | Topic | Status | Questions |
 |---|---|---|
-| [HTML](HTML.md) | 🚧 In progress | 5 |
+| [HTML](HTML.md) | 🚧 In progress | 37 |
+| [CSS](CSS.md) | 🚧 In progress | 45 |
 
 ## How to Use
 
