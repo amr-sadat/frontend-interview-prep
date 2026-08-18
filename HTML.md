@@ -40,6 +40,7 @@
 - [🔴 Q34 - What is the difference between semantic HTML and ARIA?](#q34-what-is-the-difference-between-semantic-html-and-aria)
 - [🔴 Q35 - How do you make an HTML form accessible?](#q35-how-do-you-make-an-html-form-accessible)
 - [🔴 Q36 - How do you make a website keyboard accessible?](#q36-how-do-you-make-a-website-keyboard-accessible)
+- [🔴 Q37 - What is the difference between `innerHTML`, `textContent`, and `innerText`?](#q37-what-is-the-difference-between-innerhtml-textcontent-and-innertext)
 
 ---
 
@@ -971,5 +972,68 @@ button:focus-visible { outline: 2px solid blue; outline-offset: 2px; }
 **7. No keyboard traps** — Users must always be able to Tab out of any component (a common bug in poorly-built custom modals/widgets).
 
 **Testing tip:** unplug your mouse and try to complete every core user flow using only Tab, Shift+Tab, Enter, Space, and Escape — that's the real test of keyboard accessibility.
+
+---
+
+### Q37. What is the difference between `innerHTML`, `textContent`, and `innerText`?
+
+**Answer:**
+All three are DOM properties for reading/writing an element's content, but they differ fundamentally in what they parse, what they trigger, and how safe they are.
+
+**`innerHTML`**
+Gets/sets content as an HTML string — the browser parses it and builds actual DOM nodes.
+
+```js
+el.innerHTML = "<strong>Bold</strong> text";
+// Creates a real <strong> element inside el
+```
+- **Parses markup** — tags become real elements, so it's the only one of the three that can insert structured HTML
+- **Triggers reflow/repaint** — DOM mutation always does, and re-parsing HTML on every write is comparatively expensive
+- **XSS risk** — if you insert unsanitized user input via `innerHTML`, any `<script>` or event handler attributes (`onerror=`, `onload=`) in that string can execute in the page's context. This is one of the most common real-world XSS vectors.
+
+```js
+// Dangerous if `userInput` comes from an untrusted source
+el.innerHTML = userInput; // could inject <img src=x onerror="stealCookies()">
+```
+Reading `innerHTML` also serializes the DOM back into an HTML string, including re-escaping — so `el.innerHTML` after a `textContent` write may not exactly match the original.
+
+**`textContent`**
+Gets/sets content as raw, literal text — no HTML parsing at all. Any markup you assign is inserted as literal characters, not elements.
+
+```js
+el.textContent = "<strong>Bold</strong> text";
+// Renders literally as: <strong>Bold</strong> text (visible tags, not bold)
+```
+- **Never parses HTML** — immune to injection-based XSS, because a `<script>` string just becomes visible text, never executes
+- **Ignores CSS entirely** — returns all text content of an element and its descendants, including text inside `display: none` or `visibility: hidden` elements, and ignores `<br>`-induced line breaks or `text-transform` styling
+- **Fastest** — no HTML parsing, and browsers can skip style/layout recalculation tied to visibility since it doesn't care about rendering state
+- **Best default choice** whenever you're inserting plain text, especially anything derived from user input
+
+```js
+// Safe, regardless of what commentText contains
+commentEl.textContent = userComment;
+```
+
+**`innerText`**
+Similar to `textContent` in that it doesn't parse HTML, but it's aware of rendered/visible state — it reflects what a user would actually see on screen, not the raw DOM text.
+
+```js
+el.innerText = "Some text"; // still just plain text, no HTML parsing
+```
+**Key differences from `textContent`:**
+- **Respects CSS** — excludes text inside elements with `display: none`, and includes visual line breaks caused by `<br>` or block-level elements (approximates rendered layout)
+- **Triggers a reflow to read** — because it needs to know the rendered state (what's actually visible), reading `innerText` forces the browser to recalculate layout first — this makes it noticeably slower than `textContent`, especially in a loop
+- **Non-standard historically** (originated in IE) but now standardized and supported everywhere — still considered less consistent across browsers/edge cases than `textContent`
+
+**When to use which**
+
+| Goal | Use |
+|---|---|
+| Insert/read plain text (esp. from user input) | `textContent` — safest, fastest |
+| Insert trusted, pre-sanitized HTML markup | `innerHTML` (with a sanitizer library like DOMPurify if any part is untrusted) |
+| Read only the visibly rendered text, respecting CSS | `innerText` (accept the reflow cost) |
+| Read all text regardless of visibility (e.g. hidden elements) | `textContent` |
+
+**Rule of thumb:** default to `textContent` unless you specifically need to render markup (`innerHTML`, sanitized) or visibility-aware text extraction (`innerText`).
 
 ---
